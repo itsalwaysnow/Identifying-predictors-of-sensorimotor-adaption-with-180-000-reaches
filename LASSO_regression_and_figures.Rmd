@@ -1,0 +1,902 @@
+
+
+#Setup and Data Import
+
+```{r}
+rm(list = ls())
+source("JT_Hrach_func.R")
+call_libraries()
+set.seed(111)
+
+raw.data <- read.csv('/Users/hrach_asmerian/Desktop/Final_data.csv', header=TRUE, sep=",") 
+```
+
+
+#Data filtering
+
+```{r}
+
+#Data from first-time participants selecting the shortest version of the task
+ft.data <- raw.data %>%
+  filter(repeat. == "First Time") %>%
+  filter(gameIndex == "easy") %>%
+  filter(numtar == 1) %>%
+  filter(TN <= 90)  # selecting the first 90 trials of the task
+
+```
+
+
+#Separating data by phase
+
+```{r}
+
+early.data <- ft.data %>% 
+  filter(TN >= 31 & TN <=41) %>% # reaches early in adaptation
+  group_by(Subject.ID) %>%
+  dplyr::summarise(EA = mean(HandFlip, na.rm = TRUE))
+
+late.data <- ft.data %>% 
+  filter(TN >= 74 & TN <=84) %>% # reaches late in adaptation
+  group_by(Subject.ID) %>%
+  dplyr::summarise(LA = mean(HandFlip, na.rm = TRUE))
+
+ae.data <- ft.data %>% 
+  filter(TN >= 85 & TN <=90) %>% # reaches in after-effect phase
+  group_by(Subject.ID) %>%
+  dplyr::summarise(AE = mean(HandFlip, na.rm = TRUE))
+
+```
+
+
+#Summarize demographic + behavioral vars
+
+```{r}
+
+demo.vars <- ft.data %>% filter(TN > 1 & TN <= 30) %>%
+  group_by(Subject.ID,
+           Age, 
+           Sleep, 
+           ComputerUsage,
+           Handedness,
+           education, 
+           rating, 
+           mousetype, 
+           racialorigin, 
+           sex, 
+           vision, 
+           clumsy, 
+           videogames, 
+           major,
+           browsertype,
+           screensize,
+           cardinal,
+           CCW,
+           NeuroDisease) %>%
+  dplyr::summarise(RT_mean_baseline = mean(RT, na.rm = TRUE),   # reaction, movement, and start time over first 30 trials
+                   MT_mean_baseline = mean(MT, na.rm = TRUE),
+                   ST_mean_baseline = mean(ST, na.rm = TRUE),
+                   Var_sum_baseline = sum(variability, na.rm = TRUE))   # variability in reach over first 30 trials
+
+```
+
+
+#Early phase data
+
+```{r}
+
+# Merging demographic and task data for Early phase
+early.data.w.demo <- full_join(early.data,
+                               demo.vars,
+                               by = c("Subject.ID")) %>% drop_na()
+
+
+# Converting categorical variables w/o clear hierarchy into dummy variables
+early.data.w.dummy.demo <- dummy_cols(early.data.w.demo,
+                                     select_columns = c("mousetype",
+                                                        "sex",
+                                                        "Handedness",
+                                                        "racialorigin",
+                                                        "major",
+                                                        "browsertype"),
+                                     remove_selected_columns = TRUE)
+
+# Z-scoring continuous variables
+early.data.w.dummy.demo.scaled <- na.omit(early.data.w.dummy.demo %>% 
+                                                  mutate_at( c("EA",
+                                                               "Age",
+                                                               "Sleep",
+                                                               "ComputerUsage",
+                                                               "education",
+                                                               "rating",
+                                                               "clumsy",
+                                                               "videogames",
+                                                               "RT_mean_baseline",
+                                                               "MT_mean_baseline",
+                                                               "ST_mean_baseline",
+                                                               "Var_sum_baseline",
+                                                               "screensize"),
+                                                             scale), by = "Subject.ID") %>%
+  
+  dplyr::rename(racialorigin_african_american = 'racialorigin_african-american', # renaming variables with special characters
+                racialorigin_indian_native = 'racialorigin_indian/native',
+                racialorigin_pacific_islander = 'racialorigin_pacific-islander')
+
+```
+
+
+#Late phase data
+
+```{r}
+
+# Merging demographic and task data for Late phase
+late.data.w.demo <- full_join(late.data,  
+                              demo.vars,
+                              by = c("Subject.ID")) %>% drop_na()
+
+
+# Converting categorical variables w/o clear hierarchy into dummy variables
+late.data.w.dummy.demo <- dummy_cols(late.data.w.demo, 
+                                     select_columns = c("mousetype",
+                                                        "sex",
+                                                        "Handedness",
+                                                        "racialorigin",
+                                                        "major",
+                                                        "browsertype"),
+                                     remove_selected_columns = TRUE)
+
+# Z-scoring continuous variables
+late.data.w.dummy.demo.scaled <- na.omit(late.data.w.dummy.demo %>% 
+                                                  mutate_at( c("LA",
+                                                               "Age",
+                                                               "Sleep",
+                                                               "ComputerUsage",
+                                                               "education",
+                                                               "rating",
+                                                               "clumsy",
+                                                               "videogames",
+                                                               "RT_mean_baseline",
+                                                               "MT_mean_baseline",
+                                                               "ST_mean_baseline",
+                                                               "Var_sum_baseline",
+                                                               "screensize"),
+                                                             scale), by = "Subject.ID") %>%
+  
+  dplyr::rename(racialorigin_african_american = 'racialorigin_african-american', # renaming variables with special characters
+                racialorigin_indian_native = 'racialorigin_indian/native',
+                racialorigin_pacific_islander = 'racialorigin_pacific-islander')
+
+```
+
+
+#Aftereffect phase data
+
+```{r}
+
+# Merging demographic and task data from aftereffect phase
+ae.data.w.demo <- full_join(ae.data,
+                            demo.vars,
+                            by = c("Subject.ID")) %>% drop_na()
+
+# Converting categorical variables w/o clear hierarchy into dummy variables
+ae.data.w.dummy.demo <- dummy_cols(ae.data.w.demo, 
+                                            select_columns = c("mousetype",
+                                                               "sex",
+                                                               "Handedness",
+                                                               "racialorigin",
+                                                               "major",
+                                                               "browsertype"),
+                                            remove_selected_columns = TRUE)
+
+# Z-scoring continuous variables
+ae.data.w.dummy.demo.scaled <- na.omit(ae.data.w.dummy.demo %>% 
+                                                  mutate_at( c("AE",
+                                                               "Age",
+                                                               "Sleep",
+                                                               "ComputerUsage",
+                                                               "education",
+                                                               "rating",
+                                                               "clumsy",
+                                                               "videogames",
+                                                               "RT_mean_baseline",
+                                                               "MT_mean_baseline",
+                                                               "ST_mean_baseline",
+                                                               "Var_sum_baseline",
+                                                               "screensize"),
+                                                             scale), by = "Subject.ID") %>%
+  
+  dplyr::rename(racialorigin_african_american = 'racialorigin_african-american',
+                racialorigin_indian_native = 'racialorigin_indian/native',
+                racialorigin_pacific_islander = 'racialorigin_pacific-islander') # renaming variables with special characters
+
+```
+
+
+#Group LASSO Regression on Early data
+
+```{r}
+
+early.lasso.data <- early.data.w.dummy.demo.scaled
+
+# Find 80% of the sample
+early.eighty.percent <- sample.int(n = nrow(early.lasso.data),        
+                            size = floor(.8 * nrow(early.lasso.data)), 
+                            replace = FALSE)
+
+# 80% training data
+early.training <- early.lasso.data[early.eighty.percent, ]    
+
+# 20% test data to be held until last step
+early.test <- early.lasso.data[-early.eighty.percent, ]   
+
+# All predictors
+early.x <- early.training %>% select(-starts_with("Subject.ID"), -EA) %>% data.matrix() 
+
+# Early adaptation outcomes per subject
+early.y <- early.training$EA  
+
+# A list, supplied to cv.gglasso, designating which variables belong to the same group
+groups <- c(rep(1:16, each = 1),   # First 16 columns should be treated as their own variables
+            rep(17:17, each = 3),  # 3 mouse-type columns belong to the same group
+            rep(18:18, each = 3),  # 3 sex columns belong to the same group
+            rep(19:19, each = 3),  # 3 handedness columns belong to the same group
+            rep(20:20, each = 8),  # 8 race columns belong to the same group
+            rep(21:21, each = 6), # 6 major columns belong to the same group
+            rep(22:22, each = 6)) # 6 browser columns belong to the same group
+
+# Building the cross-validated group LASSO model on early adaptation data
+early.cv.fit <- cv.gglasso(x = early.x,
+                           y = early.y,    
+                           group = groups,     # designate groups
+                           pred.loss = "L2",   # least squares regression
+                           loss = 'ls',        # deviation from the fitted mean to the response
+                           nfolds = 10)        # ten-fold cross-validation
+
+# Predicting held-out data using the model
+early.pred.y <- predict(early.cv.fit$gglasso.fit,
+                        newx = early.test %>% select(-starts_with("Subject.ID"), -EA) %>% data.matrix(),
+                        s = early.cv.fit$lambda.min) # selecting minimum lambda 
+
+# Calculating R-squared
+early.sst <- sum((early.test$EA - mean(early.test$EA))^2)    # Sum of Squares Total
+early.sse <- sum((early.pred.y - early.test$EA)^2)           # Sum of Squares Error
+early.rsq <- 1 - early.sse / early.sst                       # R squared
+early.rsq 
+
+# Extracting the beta coefficients contained in the model
+early.betas <- as.data.frame(as.matrix(coef(early.cv.fit,
+                                            s = early.cv.fit$lambda.min))) %>% rownames_to_column("Feature")
+
+# Correlation between predicted vs. actual
+cor.test(early.test$EA, early.pred.y)
+
+```
+
+
+#Group LASSO Regression on Late data
+
+```{r}
+
+late.lasso.data <- late.data.w.dummy.demo.scaled
+
+# Find 80% of the sample
+late.eighty.percent <- sample.int(n = nrow(late.lasso.data),
+                                  size = floor(.8 * nrow(late.lasso.data)),
+                                  replace = FALSE)
+
+# 80% Training data
+late.training <- late.lasso.data[late.eighty.percent, ]    
+
+# 20% Test data to be held until last step
+late.test <- late.lasso.data[-late.eighty.percent, ]   
+
+# All predictors
+late.x <- late.training%>%select(-starts_with("Subject.ID"), -LA) %>% data.matrix()
+
+# Late adaptation outcomes per subject
+late.y <- late.training$LA
+
+# Building the cross-validated group LASSO model on late adaptation data
+late.cv.fit <- cv.gglasso(x=late.x,
+                          y=late.y,
+                          group=groups,      # designate groups
+                          pred.loss = "L2",  # least squares regression
+                          loss = 'ls',       # deviation from the fitted mean to the response
+                          nfolds = 10)       # ten-fold cross-validation
+
+# Predicting held-out data using the model
+late.pred.y <- predict(late.cv.fit$gglasso.fit,
+                       newx = late.test%>%select(-starts_with("Subject.ID"), -LA) %>% data.matrix(),
+                       s = late.cv.fit$lambda.min) # selecting minimum lambda 
+
+# Calculating R-squared
+late.sst <- sum((late.test$LA - mean(late.test$LA))^2)    #Sum of Squares Total
+late.sse <- sum((late.pred.y - late.test$LA)^2)           #Sum of Squares Error
+late.rsq <- 1 - late.sse / late.sst                       #R squared
+late.rsq 
+
+# Extracting the beta coefficients contained in the model
+late.betas <- as.data.frame(as.matrix(coef(late.cv.fit,
+                                           s = late.cv.fit$lambda.min))) %>% rownames_to_column("Feature")
+
+# Correlation between predicted vs. actual
+cor.test(late.test$LA, late.pred.y)
+
+```
+
+
+#Group LASSO Regression on Aftereffect data
+
+```{r}
+
+ae.lasso.data <- ae.data.w.dummy.demo.scaled
+
+# Find 80% of the sample
+ae.eighty.percent <- sample.int(n = nrow(ae.lasso.data),
+                                size = floor(.8 * nrow(ae.lasso.data)),
+                                replace = FALSE)
+
+# 80% Training data
+ae.training <- ae.lasso.data[ae.eighty.percent, ] 
+
+# 20% Test data to be held until last step
+ae.test <- ae.lasso.data[-ae.eighty.percent, ]
+
+# All predictors
+ae.x <- ae.training%>%select(-starts_with("Subject.ID"), -AE) %>% data.matrix()
+
+# Aftereffect outcomes per subject
+ae.y <- ae.training$AE
+
+# Building the cross-validated group LASSO model on aftereffect data
+ae.cv.fit <- cv.gglasso(x=ae.x,
+                        y=ae.y,
+                        group=groups,       # designate groups
+                        pred.loss = "L2",   # least squares regression
+                        loss = 'ls',        # deviation from the fitted mean to the response
+                        nfolds = 10)        # ten-fold cross-validation
+
+# Predicting held-out data using the model
+ae.pred.y <- predict(ae.cv.fit$gglasso.fit,
+                     newx = ae.test%>%select(-starts_with("Subject.ID"), -AE) %>% data.matrix(),
+                     s = ae.cv.fit$lambda.min)  # selecting minimum lambda
+
+# Calculating R-squared
+ae.sst <- sum((ae.test$AE - mean(ae.test$AE))^2)    #Sum of Squares Total
+ae.sse <- sum((ae.pred.y - ae.test$AE)^2)           #Sum of Squares Error
+ae.rsq <- 1 - ae.sse / ae.sst                       #R squared
+ae.rsq 
+
+# Extracting the beta coefficients contained in the model
+ae.betas <- as.data.frame(as.matrix(coef(ae.cv.fit, 
+                                         s = ae.cv.fit$lambda.min))) %>% rownames_to_column("Feature")
+# Correlation between predicted vs. actual
+cor.test(ae.test$AE, ae.pred.y)
+
+```
+
+
+#Recursive Shuffling function for permutation testing
+
+```{r}
+
+shuffler <- function(original_data, model, test_data, rep_num, seed, lambda, result, var){
+  
+    if(rep_num == 0){return(result)}
+  
+    else
+      {set.seed(seed)
+        
+        I <- original_data
+        
+        if(var == "early") {
+          
+        # sample each column randomly to create shuffled variables, and performing data modifications as shown previously
+        shuff_var_data <- I %>% mutate(mousetype = sample(I$mousetype),
+                                       sex = sample(I$sex),
+                                       Handedness = sample(I$Handedness),
+                                       racialorigin = sample(I$racialorigin),
+                                       major = sample(I$major),
+                                       browsertype = sample(I$browsertype),
+                                       EA = sample(I$EA),
+                                       Age = sample(I$Age), 
+                                       Sleep = sample(I$Sleep), 
+                                       ComputerUsage = sample(I$ComputerUsage),
+                                       education = sample(I$education),
+                                       rating = sample(I$rating),
+                                       clumsy = sample(I$clumsy),
+                                       videogames = sample(I$videogames),
+                                       RT_mean_baseline = sample(I$RT_mean_baseline),
+                                       MT_mean_baseline = sample(I$MT_mean_baseline),
+                                       ST_mean_baseline = sample(I$ST_mean_baseline),
+                                       Var_sum_baseline = sample(I$Var_sum_baseline),
+                                       screensize = sample(I$screensize)) %>% 
+          
+          dummy_cols(select_columns = c("mousetype",
+                                        "sex",
+                                        "Handedness",
+                                        "racialorigin",
+                                        "major",
+                                        "browsertype"),
+                     remove_selected_columns = TRUE) %>%
+          
+          mutate_at( c("EA",
+                       "Age",
+                       "Sleep",
+                       "ComputerUsage",
+                       "education",
+                       "rating",
+                       "clumsy",
+                       "videogames",
+                       "RT_mean_baseline",
+                       "MT_mean_baseline",
+                       "ST_mean_baseline",
+                       "Var_sum_baseline",
+                       "screensize"), scale) %>%
+          
+  dplyr::rename(racialorigin_african_american = 'racialorigin_african-american',
+                racialorigin_indian_native = 'racialorigin_indian/native',
+                racialorigin_pacific_islander = 'racialorigin_pacific-islander')%>% 
+          
+      filter(Subject.ID %in% test_data$Subject.ID)
+       
+      # Perform model building and r-squared calculations as previously shown                                         
+      prediction <- predict(model, 
+                           newx = shuff_var_data%>%select(-starts_with("Subject.ID"), -EA)%>%data.matrix(), 
+                           s = lambda)
+      
+      sst <- sum((shuff_var_data$EA - mean(shuff_var_data$EA))^2)    #Sum of Squares Total and Error
+      sse <- sum((prediction - shuff_var_data$EA)^2)
+      rsq <- 1 - sse / sst 
+       
+      result[nrow(result) + 1,] <- rsq
+      rep_num <- rep_num - 1
+      seeds_left <- seed + 1
+      
+      return(shuffler(original_data, model, test_data, rep_num, seeds_left, lambda, result, var))
+      
+        }
+        
+        if(var == "late") {
+          
+        # sample each column randomly to create shuffled variables and performing data modifications as shown previously
+        shuff_var_data <- I %>% mutate(mousetype = sample(I$mousetype),
+                                       sex = sample(I$sex),
+                                       Handedness = sample(I$Handedness),
+                                       racialorigin = sample(I$racialorigin),
+                                       major = sample(I$major),
+                                       browsertype = sample(I$browsertype),
+                                       LA = sample(I$LA),
+                                       Age = sample(I$Age), 
+                                       Sleep = sample(I$Sleep), 
+                                       ComputerUsage = sample(I$ComputerUsage),
+                                       education = sample(I$education),
+                                       rating = sample(I$rating),
+                                       clumsy = sample(I$clumsy),
+                                       videogames = sample(I$videogames),
+                                       RT_mean_baseline = sample(I$RT_mean_baseline),
+                                       MT_mean_baseline = sample(I$MT_mean_baseline),
+                                       ST_mean_baseline = sample(I$ST_mean_baseline),
+                                       Var_sum_baseline = sample(I$Var_sum_baseline),
+                                       screensize = sample(I$screensize)) %>% 
+          
+          dummy_cols(select_columns = c("mousetype",
+                                        "sex",
+                                        "Handedness",
+                                        "racialorigin",
+                                        "major",
+                                        "browsertype"),
+                     remove_selected_columns = TRUE) %>%
+          
+          mutate_at( c("LA",
+                       "Age",
+                       "Sleep",
+                       "ComputerUsage",
+                       "education",
+                       "rating",
+                       "clumsy",
+                       "videogames",
+                       "RT_mean_baseline",
+                       "MT_mean_baseline",
+                       "ST_mean_baseline",
+                       "Var_sum_baseline",
+                       "screensize"), scale) %>%
+          
+  dplyr::rename(racialorigin_african_american = 'racialorigin_african-american',
+                racialorigin_indian_native = 'racialorigin_indian/native',
+                racialorigin_pacific_islander = 'racialorigin_pacific-islander')%>% 
+          
+      filter(Subject.ID %in% test_data$Subject.ID)
+      
+      # Perform model building and r-squared calculations as previously shown                                             
+      prediction <- predict(model, 
+                           newx = shuff_var_data%>%select(-starts_with("Subject.ID"), -LA)%>%data.matrix(), 
+                           s = lambda)
+      
+      sst <- sum((shuff_var_data$LA - mean(shuff_var_data$LA))^2)    #Sum of Squares Total and Error
+      sse <- sum((prediction - shuff_var_data$LA)^2)
+      rsq <- 1 - sse / sst 
+       
+      result[nrow(result) + 1,] <- rsq
+      rep_num <- rep_num - 1
+      seeds_left <- seed + 1
+      
+      return(shuffler(original_data, model, test_data, rep_num, seeds_left, lambda, result, var))
+      
+      }
+        
+        if(var == "ae") {
+          
+        # sample each column randomly to create shuffled variables and performing data modifications as shown previously
+        shuff_var_data <- I %>% mutate(mousetype = sample(I$mousetype),
+                                       sex = sample(I$sex),
+                                       Handedness = sample(I$Handedness),
+                                       racialorigin = sample(I$racialorigin),
+                                       major = sample(I$major),
+                                       browsertype = sample(I$browsertype),
+                                       AE = sample(I$AE),
+                                       Age = sample(I$Age), 
+                                       Sleep = sample(I$Sleep), 
+                                       ComputerUsage = sample(I$ComputerUsage),
+                                       education = sample(I$education),
+                                       rating = sample(I$rating),
+                                       clumsy = sample(I$clumsy),
+                                       videogames = sample(I$videogames),
+                                       RT_mean_baseline = sample(I$RT_mean_baseline),
+                                       MT_mean_baseline = sample(I$MT_mean_baseline),
+                                       ST_mean_baseline = sample(I$ST_mean_baseline),
+                                       Var_sum_baseline = sample(I$Var_sum_baseline),
+                                       screensize = sample(I$screensize)) %>% 
+          
+          dummy_cols(select_columns = c("mousetype",
+                                        "sex",
+                                        "Handedness",
+                                        "racialorigin",
+                                        "major",
+                                        "browsertype"),
+                     remove_selected_columns = TRUE) %>%
+          
+          mutate_at( c("AE",
+                       "Age",
+                       "Sleep",
+                       "ComputerUsage",
+                       "education",
+                       "rating",
+                       "clumsy",
+                       "videogames",
+                       "RT_mean_baseline",
+                       "MT_mean_baseline",
+                       "ST_mean_baseline",
+                       "Var_sum_baseline",
+                       "screensize"), scale) %>%
+          
+  dplyr::rename(racialorigin_african_american = 'racialorigin_african-american',
+                racialorigin_indian_native = 'racialorigin_indian/native',
+                racialorigin_pacific_islander = 'racialorigin_pacific-islander')%>% 
+          
+      filter(Subject.ID %in% test_data$Subject.ID)
+      
+      # Perform model building and r-squared calculations as previously shown                                             
+      prediction <- predict(model, 
+                           newx = shuff_var_data%>%select(-starts_with("Subject.ID"), -AE)%>%data.matrix(), 
+                           s = lambda)
+      
+      sst <- sum((shuff_var_data$AE - mean(shuff_var_data$AE))^2)    #Sum of Squares Total and Error
+      sse <- sum((prediction - shuff_var_data$AE)^2)
+      rsq <- 1 - sse / sst 
+       
+      result[nrow(result) + 1,] <- rsq
+      rep_num <- rep_num - 1
+      seeds_left <- seed + 1
+      
+      return(shuffler(original_data, model, test_data, rep_num, seeds_left, lambda, result, var))
+      
+        }
+    }
+}
+
+```
+
+
+#1000x Shuffler using group LASSO models
+
+```{r}
+
+early.noise <- shuffler(early.data.w.demo,
+                        early.cv.fit$gglasso.fit,
+                        early.test,
+                        1000,
+                        123,
+                        early.cv.fit$lambda.min, 
+                        data.frame(123), # dummy dataframe
+                        "early") %>% filter(X123 != 123,)
+
+late.noise <- shuffler(late.data.w.demo,
+                       late.cv.fit$gglasso.fit,
+                       late.test,
+                       1000,
+                       123,
+                       late.cv.fit$lambda.min,
+                       data.frame(123), # dummy dataframe
+                       "late") %>% filter(X123 != 123)
+
+ae.noise <- shuffler(ae.data.w.demo,
+                     ae.cv.fit$gglasso.fit,
+                     ae.test,
+                     1000,
+                     123,
+                     ae.cv.fit$lambda.min, 
+                     data.frame(123), # dummy dataframe
+                     "ae") %>% filter(X123 != 123)
+ 
+# Save re-sampled data
+write.csv(early.noise,'early_1000_resamples.csv')
+write.csv(late.noise,'late_1000_resamples.csv')
+write.csv(ae.noise,'ae_1000_resamples.csv')
+
+```
+
+
+#Permutation plots against actual model performance
+
+```{r}
+
+early.noise %>% ggplot(aes(x=X123))+
+  geom_boxplot()+
+  geom_vline(xintercept = early.rsq, color = 'red') + 
+  labs(x= 'R by chance') +
+  theme_minimal()
+
+late.noise %>% ggplot(aes(x=X123))+
+  geom_boxplot()+
+  geom_vline(xintercept = late.rsq, color = 'red') + 
+  labs(x= 'R by chance') +
+  theme_minimal()
+
+ae.noise %>% ggplot(aes(x=X123))+
+  geom_boxplot()+
+  geom_vline(xintercept = ae.rsq, color = 'red') + 
+  labs(x= 'R by chance') +
+  theme_minimal()
+
+```
+
+
+#Beta Figures
+
+```{r}
+
+colnames(early.betas) <- c('Feature', 'Early')
+early.betas <- early.betas %>% filter( 'Feature' != '(Intercept)')
+
+colnames(late.betas) <- c('Feature', 'Late')
+late.betas <- late.betas %>% filter( 'Feature' != '(Intercept)')
+
+colnames(ae.betas) <- c('Feature', 'After_effect')
+ae.betas <- ae.betas %>% filter( 'Feature' != '(Intercept)')
+
+all.betas <- Reduce(function(x,y) merge(x,y,by="Feature", all=TRUE), list(early.betas, late.betas, ae.betas)) %>% 
+  filter(Feature != "(Intercept)")
+
+all.betas[,-1] <- round(all.betas[,-1], 2)
+
+all.betas.w.labels <- all.betas %>%
+  mutate(
+    lab = c(
+      "Age",
+      "Browser: Chrome",
+      "Browser: Edge",
+      "Browser: FireFox",
+      "Browser: Not Detected",
+      "Browser: Opera",
+      "Browser: Safari",
+      "Cardinal",
+      "CCW",
+      "Clumsy",
+      "Computer",
+      "Education",
+      "Hand: Ambi.",
+      "Hand: Left",
+      "Hand: Right",
+      "Major: Arts",
+      "Major: Business",
+      "Major: Other",
+      "Major: Psych.",
+      "Major: Social sci.",
+      "Major: Stem",
+      "Mouse: Optical",
+      "Mouse: Other",
+      "Mouse: Track",
+      "Movement Time Mean",
+      "Neurological Disease",
+      "Race: African-American",
+      "Race: Asian",
+      "Race: Indian Native",
+      "Race: Latinx",
+      "Race: Multiple",
+      "Race: Other",
+      "Race: Pacific Islander",
+      "Race: White",
+      "Rating",
+      "Reaction Time Mean",
+      "Screen Size",
+      "Sex: Female",
+      "Sex: Male",
+      "Sex: Other",
+      "Sleep",
+      "Start Time Mean",
+      "Variability",
+      "Video Games",
+      "Vision"
+    )
+  ) %>%
+  
+  mutate(shape_E = case_when(Early < 0 ~ '1',
+                             TRUE ~ '0')) %>%
+  mutate(shape_L = case_when(Late < 0 ~ '1',
+                             TRUE ~ '0')) %>%
+  mutate(shape_A = case_when(After_effect < 0 ~ '1',
+                             TRUE ~ '0'))
+
+early.late.beta.plot <- ggplot(all.betas.w.labels,
+                               aes(
+                                 x = abs(Early),
+                                 y = factor(reorder(lab, abs(Late))),
+                                 shape = shape_E
+                               )) +
+  geom_vline(aes(xintercept = 0),
+             alpha = .7,
+             color = 'light grey') +
+  geom_point(size = 2.5,
+             alpha = .7,
+             color = 'blueviolet') +
+  geom_point(
+    size = 2.5,
+    aes(
+      x = abs(Late),
+      y = reorder(lab, Late),
+      shape = shape_L
+    ),
+    alpha = .7,
+    color = 'firebrick2'
+  ) +
+  theme(
+    axis.text.x = element_text(size = 12, hjust = 0.95),
+    axis.text.y = element_text(size = 12, hjust = 0.95),
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.background = element_blank(),
+    axis.line = element_line(colour = "black"),
+    legend.position = 'none'
+  ) +
+  scale_x_continuous(limits = c(0, .20)) +
+  scale_shape_manual(values = c(1, 10), guide = FALSE)
+early.late.beta.plot
+
+
+ae.beta.plot <- ggplot(all.betas.w.labels,
+                       aes(
+                         x = abs(After_effect),
+                         y = factor(reorder(lab, abs(After_effect))),
+                         shape = shape_A
+                       )) +
+  geom_vline(aes(xintercept = 0), alpha = .7, color = 'light grey') +
+  geom_point(size = 2.5, alpha = .7) +
+  theme(
+    axis.text.x = element_text(size = 12, hjust = 0.95),
+    axis.text.y = element_text(size = 12, hjust = 0.95),
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.background = element_blank(),
+    axis.line = element_line(colour = "black"),
+    legend.position = 'none'
+  ) +
+  scale_x_continuous(limits = c(0, .4)) +
+  scale_shape_manual(values = c(1, 10), guide = FALSE)
+ae.beta.plot
+
+```
+
+
+# Age and Adaptation
+
+```{r}
+
+my.phase <- ft.data %>%
+  mutate(phase = case_when(
+    TN >= 31 & TN <= 41 ~ "Early",
+    TN >= 75 & TN <= 84 ~ "Late",
+    TN >= 85 & TN <= 90 ~ "After"
+  ))
+my_phase_sum <- my.phase %>%
+  group_by(SN, phase, Age) %>%
+  dplyr::summarise(Hand_mean = mean(HandFlip, na.rm = TRUE),
+                   RT_mean = mean(RT, na.rm = TRUE)) %>%
+  drop_na()
+
+my_phase_sum$phase <-
+  factor(my_phase_sum$phase, levels = c("Early", "Late", "After"))
+
+age_plot <- my_phase_sum %>%
+  filter(Age < 85 & phase != "Early") %>%
+  mutate(Age = round(Age / 10) * 10, GroupingVar = 1) %>%
+  ggplot(aes(x = Age, y = Hand_mean)) +
+  geom_pointrange(
+    stat = "summary",
+    fun.ymin = min,
+    fun.ymax = max,
+    fun.y = mean,
+    size = .4
+  ) +
+  stat_summary(fun = "mean", geom = "line", aes(group = GroupingVar)) +
+  scale_y_continuous(breaks = seq(-45, 45, 15)) +
+  facet_rep_wrap(. ~ phase, ncol = 2, repeat.tick.labels = TRUE) +
+  scale_x_continuous(breaks = seq(10, 90, 10)) +
+  labs(x = "Age", y = "Hand Angle (°)", title = "") +
+  scale_y_continuous(breaks = seq(0, 45, 5)) +
+  coord_capped_cart(ylim = c(10, 45)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 0.95)) +
+  theme_classic()
+print(age_plot)
+
+my_phase_sum %>%
+  filter(Age < 85 & phase == "Late") %>%
+  ggplot(aes(x = Age, y = Hand_mean)) +
+  geom_pointrange(
+    stat = "summary",
+    fun.ymin = min,
+    fun.ymax = max,
+    fun.y = mean,
+    size = .4
+  ) +
+  geom_smooth()
+
+ggplotRegression <- function (fit) {
+  require(ggplot2)
+  
+  ggplot(fit$model, aes_string(x = names(fit$model)[2], y = names(fit$model)[1])) +
+    geom_point() +
+    stat_smooth(method = "lm", col = "red") +
+    labs(title = paste(
+      "Adj R2 = ",
+      signif(summary(fit)$adj.r.squared, 5),
+      "Intercept =",
+      signif(fit$coef[[1]], 5),
+      " Slope =",
+      signif(fit$coef[[2]], 5),
+      " P =",
+      signif(summary(fit)$coef[2, 4], 5)
+    ))
+}
+
+ggplotRegression(lm(
+  Hand_mean ~ Age,
+  data = my_phase_sum %>%
+    filter(Age < 85 & phase != "Early") %>%
+    mutate(Age = round(Age / 10) * 10, GroupingVar = 1) %>%
+    filter(phase == "Late")
+))
+
+my_phase_sum %>% filter(Age < 85 & phase != "Early") %>%
+  mutate(Age = round(Age / 10) * 10, GroupingVar = 1) %>%
+  filter(phase == "Late")
+
+summary(lm(Hand_mean ~ Age, data = my_phase_sum %>% filter(Age < 85 &
+                                                             phase == "Late")))
+summary(glm(Hand_mean ~ Age, data = my_phase_sum %>% filter(Age < 85 &
+                                                              phase == "Late")))
+
+lin <-
+  lm(Hand_mean ~ Age, data = my_phase_sum %>% filter(Age < 85 &
+                                                       phase == "Late"))
+nonlin <-
+  glm(Hand_mean ~ Age, data = my_phase_sum %>% filter(Age < 85 &
+                                                        phase == "Late"))
+
+
+extractAIC(lin)
+extractAIC(nonlin)
+```
