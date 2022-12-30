@@ -8,7 +8,15 @@ source("JT_Hrach_func.R")
 call_libraries()
 set.seed(111)
 
-raw.data <- read.csv('/Users/hrach_asmerian/Desktop/Final_data.csv', header=TRUE, sep=",") 
+df1 <- read.csv(file = "Final_data_chunk_1.csv")
+df2 <- read.csv(file = "Final_data_chunk_2.csv")
+df3 <- read.csv(file = "Final_data_chunk_3.csv")
+df4 <- read.csv(file = "Final_data_chunk_4.csv")
+df5 <- read.csv(file = "Final_data_chunk_5.csv")
+df6 <- read.csv(file = "Final_data_chunk_6.csv")
+
+raw.data <- do.call("rbind", list(df1, df2, df3, df4, df5, df6))
+
 ```
 
 
