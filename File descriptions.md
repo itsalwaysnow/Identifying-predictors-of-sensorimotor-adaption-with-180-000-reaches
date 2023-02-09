@@ -13,3 +13,7 @@ This file contains reach plots stratified by various demographic and behavioral 
 
 This file performs LASSO regression predicting adaptation metrics using demographic and behavioral measures using the cv.gglasso function in [gglasso](https://www.rdocumentation.org/packages/gglasso/versions/1.5/topics/cv.gglasso) (version 1.5).
 This script also contains the "Shuffler" function which creates permutations of the supplied data set "X" number of times and plots actual model performance against models built from randomly permuted data. Beta coefficients from the models built on Early, Late and After-effect phases of adaptation are plotted, as well as adaptation vs. age figures.
+
+### testmybrain_data_30Dec2022_part_#.csv
+
+The original [testmybrain.org](https://testmybrain.org/) data set has been split to be able to store within this repository. These splits are bound back together within the aforementioned Rmd files.
