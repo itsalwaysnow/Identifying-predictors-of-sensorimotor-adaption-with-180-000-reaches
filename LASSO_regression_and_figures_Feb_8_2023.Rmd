@@ -4,19 +4,25 @@
 
 ```{r}
 rm(list = ls())
-source("JT_Hrach_func.R")
-call_libraries()
-set.seed(111)
 
-df1 <- read.csv(file = "Final_data_chunk_1.csv")
-df2 <- read.csv(file = "Final_data_chunk_2.csv")
-df3 <- read.csv(file = "Final_data_chunk_3.csv")
-df4 <- read.csv(file = "Final_data_chunk_4.csv")
-df5 <- read.csv(file = "Final_data_chunk_5.csv")
-df6 <- read.csv(file = "Final_data_chunk_6.csv")
+library(dplyr)
+library(ggplot2)
+library(gglasso)
+library(pracma)
+library(tidyr)
+library(fastDummies)
+library(lemon)
 
-raw.data <- do.call("rbind", list(df1, df2, df3, df4, df5, df6))
+#Data separated for storage on GitHub repository
+df1 <- read.csv(file = "testmybrain_data_30Dec2022_part_1.csv")
+df2 <- read.csv(file = "testmybrain_data_30Dec2022_part_2.csv")
+df3 <- read.csv(file = "testmybrain_data_30Dec2022_part_3.csv")
+df4 <- read.csv(file = "testmybrain_data_30Dec2022_part_4.csv")
+df5 <- read.csv(file = "testmybrain_data_30Dec2022_part_5.csv")
+df6 <- read.csv(file = "testmybrain_data_30Dec2022_part_6.csv")
 
+#Binding split data
+raw.data<- do.call("rbind", list(df1, df2, df3, df4, df5, df6))
 ```
 
 
@@ -28,8 +34,10 @@ raw.data <- do.call("rbind", list(df1, df2, df3, df4, df5, df6))
 ft.data <- raw.data %>%
   filter(repeat. == "First Time") %>%
   filter(gameIndex == "easy") %>%
+  filter(TN < 90) %>%
   filter(numtar == 1) %>%
-  filter(TN <= 90)  # selecting the first 90 trials of the task
+  mutate(mov_avg = movavg(HandFlip, 3, type = c('s'))) %>%
+  mutate(variability = abs(mov_avg-HandFlip))
 
 ```
 
@@ -222,7 +230,7 @@ ae.data.w.dummy.demo.scaled <- na.omit(ae.data.w.dummy.demo %>%
 #Group LASSO Regression on Early data
 
 ```{r}
-
+set.seed(111)
 early.lasso.data <- early.data.w.dummy.demo.scaled
 
 # Find 80% of the sample
@@ -265,14 +273,14 @@ early.pred.y <- predict(early.cv.fit$gglasso.fit,
                         s = early.cv.fit$lambda.min) # selecting minimum lambda 
 
 # Calculating R-squared
-early.sst <- sum((early.test$EA - mean(early.test$EA))^2)    # Sum of Squares Total
+early.sst <- sum((early.test$EA - mean(early.training$EA))^2)    # Sum of Squares Total
 early.sse <- sum((early.pred.y - early.test$EA)^2)           # Sum of Squares Error
 early.rsq <- 1 - early.sse / early.sst                       # R squared
 early.rsq 
 
 # Extracting the beta coefficients contained in the model
 early.betas <- as.data.frame(as.matrix(coef(early.cv.fit,
-                                            s = early.cv.fit$lambda.min))) %>% rownames_to_column("Feature")
+                                            s = early.cv.fit$lambda.min))) %>% tibble::rownames_to_column("Feature")
 
 # Correlation between predicted vs. actual
 cor.test(early.test$EA, early.pred.y)
@@ -283,7 +291,7 @@ cor.test(early.test$EA, early.pred.y)
 #Group LASSO Regression on Late data
 
 ```{r}
-
+set.seed(123)
 late.lasso.data <- late.data.w.dummy.demo.scaled
 
 # Find 80% of the sample
@@ -317,14 +325,14 @@ late.pred.y <- predict(late.cv.fit$gglasso.fit,
                        s = late.cv.fit$lambda.min) # selecting minimum lambda 
 
 # Calculating R-squared
-late.sst <- sum((late.test$LA - mean(late.test$LA))^2)    #Sum of Squares Total
+late.sst <- sum((late.test$LA - mean(late.training$LA))^2)    #Sum of Squares Total
 late.sse <- sum((late.pred.y - late.test$LA)^2)           #Sum of Squares Error
 late.rsq <- 1 - late.sse / late.sst                       #R squared
 late.rsq 
 
 # Extracting the beta coefficients contained in the model
 late.betas <- as.data.frame(as.matrix(coef(late.cv.fit,
-                                           s = late.cv.fit$lambda.min))) %>% rownames_to_column("Feature")
+                                           s = late.cv.fit$lambda.min))) %>% tibble::rownames_to_column("Feature")
 
 # Correlation between predicted vs. actual
 cor.test(late.test$LA, late.pred.y)
@@ -335,7 +343,7 @@ cor.test(late.test$LA, late.pred.y)
 #Group LASSO Regression on Aftereffect data
 
 ```{r}
-
+set.seed(111)
 ae.lasso.data <- ae.data.w.dummy.demo.scaled
 
 # Find 80% of the sample
@@ -369,14 +377,16 @@ ae.pred.y <- predict(ae.cv.fit$gglasso.fit,
                      s = ae.cv.fit$lambda.min)  # selecting minimum lambda
 
 # Calculating R-squared
-ae.sst <- sum((ae.test$AE - mean(ae.test$AE))^2)    #Sum of Squares Total
+ae.sst <- sum((ae.test$AE - mean(ae.training$AE))^2)    #Sum of Squares Total
 ae.sse <- sum((ae.pred.y - ae.test$AE)^2)           #Sum of Squares Error
 ae.rsq <- 1 - ae.sse / ae.sst                       #R squared
 ae.rsq 
 
+
+
 # Extracting the beta coefficients contained in the model
 ae.betas <- as.data.frame(as.matrix(coef(ae.cv.fit, 
-                                         s = ae.cv.fit$lambda.min))) %>% rownames_to_column("Feature")
+                                         s = ae.cv.fit$lambda.min))) %>% tibble::rownames_to_column("Feature")
 # Correlation between predicted vs. actual
 cor.test(ae.test$AE, ae.pred.y)
 
@@ -809,7 +819,7 @@ ae.beta.plot
 ```
 
 
-# Age and Adaptation
+#Age and Adaptation
 
 ```{r}
 
@@ -829,7 +839,7 @@ my_phase_sum$phase <-
   factor(my_phase_sum$phase, levels = c("Early", "Late", "After"))
 
 age_plot <- my_phase_sum %>%
-  filter(Age < 85 & phase != "Early") %>%
+  filter(Age < 85 ) %>%
   mutate(Age = round(Age / 10) * 10, GroupingVar = 1) %>%
   ggplot(aes(x = Age, y = Hand_mean)) +
   geom_pointrange(
@@ -862,49 +872,6 @@ my_phase_sum %>%
   ) +
   geom_smooth()
 
-ggplotRegression <- function (fit) {
-  require(ggplot2)
-  
-  ggplot(fit$model, aes_string(x = names(fit$model)[2], y = names(fit$model)[1])) +
-    geom_point() +
-    stat_smooth(method = "lm", col = "red") +
-    labs(title = paste(
-      "Adj R2 = ",
-      signif(summary(fit)$adj.r.squared, 5),
-      "Intercept =",
-      signif(fit$coef[[1]], 5),
-      " Slope =",
-      signif(fit$coef[[2]], 5),
-      " P =",
-      signif(summary(fit)$coef[2, 4], 5)
-    ))
-}
-
-ggplotRegression(lm(
-  Hand_mean ~ Age,
-  data = my_phase_sum %>%
-    filter(Age < 85 & phase != "Early") %>%
-    mutate(Age = round(Age / 10) * 10, GroupingVar = 1) %>%
-    filter(phase == "Late")
-))
-
-my_phase_sum %>% filter(Age < 85 & phase != "Early") %>%
-  mutate(Age = round(Age / 10) * 10, GroupingVar = 1) %>%
-  filter(phase == "Late")
-
-summary(lm(Hand_mean ~ Age, data = my_phase_sum %>% filter(Age < 85 &
-                                                             phase == "Late")))
-summary(glm(Hand_mean ~ Age, data = my_phase_sum %>% filter(Age < 85 &
-                                                              phase == "Late")))
-
-lin <-
-  lm(Hand_mean ~ Age, data = my_phase_sum %>% filter(Age < 85 &
-                                                       phase == "Late"))
-nonlin <-
-  glm(Hand_mean ~ Age, data = my_phase_sum %>% filter(Age < 85 &
-                                                        phase == "Late"))
 
 
-extractAIC(lin)
-extractAIC(nonlin)
 ```
