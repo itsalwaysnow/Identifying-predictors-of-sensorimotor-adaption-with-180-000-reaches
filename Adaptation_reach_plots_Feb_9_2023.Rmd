@@ -33,27 +33,8 @@ ft.data <- raw.data %>%
   mutate(mov_avg = movavg(HandFlip, 3, type = c('s'))) %>%
   mutate(variability = abs(mov_avg-HandFlip))
 
-demo.vars <- ft.data %>% filter(TN > 1 & TN <= 30) %>%
-  group_by(Subject.ID,
-           Age, 
-           Sleep, 
-           ComputerUsage,
-           Handedness,
-           education, 
-           rating, 
-           mousetype, 
-           racialorigin, 
-           sex, 
-           vision, 
-           clumsy, 
-           videogames, 
-           major,
-           browsertype,
-           screensize,
-           cardinal,
-           CCW,
-           NeuroDisease) %>%
-  
+demo.vars <- ft.data %>% filter(TN <= 30) %>%
+  group_by(Subject.ID) %>%
   dplyr::summarise(RT_mean_baseline = mean(RT, na.rm = TRUE),
                    MT_mean_baseline = mean(MT, na.rm = TRUE),
                    ST_mean_baseline = mean(ST, na.rm = TRUE),
@@ -168,6 +149,40 @@ ft.data.wrepeat %>%
   scale_y_continuous(breaks = c(0, 100, 200, 300, 400, 500)) + 
   labs(x= 'Repeat Users')
 
+
+```
+#Adaptation averages across sessions and phase
+
+```{r}
+
+repeat_sessions <- ft.data.wrepeat %>% 
+  mutate(timesplayed = case_when(repeat. == "First Time" ~ 1, 
+                                 repeat. == "Second Time" ~ 2, 
+                                 repeat. == "Third Time" ~ 3, 
+                                 repeat. == "More than three" ~ 4),
+        phase = case_when(TN >= 31 & TN <= 40 ~ "Early", 
+                           TN >= 74 & TN <= 84 ~ "Late", 
+                           TN >= 85 & TN <= 90 ~ "Aftereffect")) 
+
+
+repeat_sessions$phase <- factor(repeat_sessions$phase, levels = c("Early", "Late", "Aftereffect"))
+
+across_sessions <- repeat_sessions %>% 
+  group_by(Subject.ID, timesplayed, phase) %>%
+  dplyr::summarise(Hand_mean = mean(HandFlip, na.rm = TRUE)) %>% 
+  drop_na(phase) %>% 
+  ggplot(aes(x = timesplayed, y = Hand_mean)) + 
+  stat_summary(fun.data = "mean_se", geom = "pointrange", size = 0.2) + 
+  stat_summary(fun = "mean", geom = "line") + 
+  coord_capped_cart(ylim = c(0, 45)) + 
+  facet_rep_wrap(.~phase, repeat.tick.labels = TRUE) + 
+  scale_y_continuous(breaks = c(0, 15, 30, 45)) + 
+  theme_minimal() +  
+  theme(strip.background = element_blank(),
+  strip.text.x = element_blank()) + 
+  labs(y  = "Hand Angle (°)", x = "Session") 
+
+across_sessions
 
 ```
 
@@ -318,6 +333,7 @@ myearlylatecor
 #Split-half Reliability R-squared
 
 ```{r}
+is.even <- function(x) x %% 2 == 0
 
 eo_early_Rsqr <- ft.data %>%
   filter(TN >=31 & TN <=42) %>%
@@ -512,10 +528,10 @@ ratingplot
 
 ```{r}
 
-MT_subs <- demo.vars
-MT_subs$Above<- ifelse(MT_subs$MT_mean_baseline > median(MT_subs$MT_mean_baseline), "Above Median (slower)", "Below Median (faster)")
+fast_mt <- demo.vars$Subject.ID[demo.vars$MT_mean_baseline < median(demo.vars$MT_mean_baseline) ]
 
-MTdata <- na.omit(full_join(ft.data, MT_subs, by = c("Subject.ID"))) %>% 
+MTdata <- ft.data %>%
+ mutate(Above = ifelse(Subject.ID %in% fast_mt, 'Fast', 'Slow')) %>% 
   group_by(TN, Block, FB, Above) %>%
   dplyr::summarise(Hand_mean = mean(HandFlip, na.rm = TRUE), Hand_sem = std.error(HandFlip, na.rm = TRUE) )
 
@@ -571,11 +587,10 @@ sexplot
 
 ```{r}
 
-var_subs <- demo.vars
-var_subs$Above<- ifelse(var_subs$Var_sum_baseline > median(var_subs$Var_sum_baseline), "Above Median", "Below Median")
+low_var <- demo.vars$Subject.ID[demo.vars$Var_sum_baseline < median(demo.vars$Var_sum_baseline) ]
 
-
-vardata <- na.omit(full_join(ft.data, var_subs, by = c("Subject.ID"))) %>% 
+vardata <- ft.data %>%
+ mutate(Above = ifelse(Subject.ID %in% low_var, 'Low Variability', 'High Variability')) %>% 
   group_by(TN, Block, FB, Above) %>%
   dplyr::summarise(Hand_mean = mean(HandFlip, na.rm = TRUE), Hand_sem = std.error(HandFlip, na.rm = TRUE) )
 
@@ -620,18 +635,17 @@ eduplot <- p1 %+% educationdata + aes(fill = education, group = interaction(fact
 eduplot
 ```
 
-#Search time
+#Start time
 
 ```{r}
 
-ST_subs <- demo.vars
-ST_subs$Above<- ifelse(ST_subs$ST_mean_baseline > median(ST_subs$ST_mean_baseline), "Above Median", "Below Median")
+fast_st <- demo.vars$Subject.ID[demo.vars$ST_mean_baseline < median(demo.vars$ST_mean_baseline) ]
 
-
-STdata <- na.omit(full_join(ft.data, ST_subs, by = c("Subject.ID"))) %>% 
+STdata <- ft.data %>%
+ mutate(Above = ifelse(Subject.ID %in% fast_st, 'Fast', 'Slow')) %>% 
   group_by(TN, Block, FB, Above) %>%
   dplyr::summarise(Hand_mean = mean(HandFlip, na.rm = TRUE), Hand_sem = std.error(HandFlip, na.rm = TRUE) )
-
+ 
 STplot <- p1 %+% STdata + aes(fill = factor(Above), group = interaction(factor(Block), factor(Above))) + 
   geom_point (aes(color = factor(Above)), size = 0.5) + 
   geom_ribbon(aes(ymin = Hand_mean - Hand_sem, ymax = Hand_mean + Hand_sem), alpha = 0.05) +
@@ -665,11 +679,10 @@ cardinalplot
 
 ```{r}
 
-RT_subs <- demo.vars
-RT_subs$Above<- ifelse(RT_subs$RT_mean_baseline > median(RT_subs$RT_mean_baseline), "Above Median", "Below Median")
+fast_rt <- demo.vars$Subject.ID[demo.vars$RT_mean_baseline < median(demo.vars$RT_mean_baseline) ]
 
-
-RTdata <- na.omit(full_join(ft.data, RT_subs, by = c("Subject.ID"))) %>% 
+RTdata <- ft.data %>%
+  mutate(Above = ifelse(Subject.ID %in% fast_rt, 'Fast', 'Slow')) %>% 
   group_by(TN, Block, FB, Above) %>%
   dplyr::summarise(Hand_mean = mean(HandFlip, na.rm = TRUE), Hand_sem = std.error(HandFlip, na.rm = TRUE) )
 
@@ -742,11 +755,10 @@ handed_plot
 
 ```{r}
 
-screen_subs <- demo.vars
-screen_subs$Above<- ifelse(screen_subs$screensize > median(screen_subs$screensize), "Above Median", "Below Median")
+small_screen_subs <- ft.data$Subject.ID[ft.data$screensize < median(ft.data$screensize) ]
 
-
-screendata <- na.omit(full_join(ft.data, screen_subs, by = c("Subject.ID"))) %>% 
+screendata <- ft.data %>%
+ mutate(Above = ifelse(Subject.ID %in% small_screen_subs, 'Small', 'Large')) %>% 
   group_by(TN, Block, FB, Above) %>%
   dplyr::summarise(Hand_mean = mean(HandFlip, na.rm = TRUE), Hand_sem = std.error(HandFlip, na.rm = TRUE) )
 
